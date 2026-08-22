@@ -1,7 +1,10 @@
-name: "svf-vllm-disagg-gb300-2p1d-dep8-dep12-c1152-mtp-agentic"
+# Source: https://github.com/SemiAnalysisAI/InferenceX/blob/c0fce8a2682364c68858e5ed8995bf94bbb70e30/benchmarks/multi_node/srt-slurm-recipes/vllm/deepseek-v4/agentic/disagg-gb300-1p1d-dep8-dep32-c388-mtp-agentic.yaml
+# Preserve the source point's topology-specific batching while aligning its
+# shared runtime settings with the current GB300 P/D recipes in this branch.
+name: "svf-vllm-disagg-gb300-1p1d-dep8-dep32-c448-mtp-agentic"
 
-# GB300 AgentX MTP3 topology: two DEP8 prefill workers feed one
-# DEP12 decode worker at concurrency 1152. Decode consumes P/D KV through NIXL
+# GB300 AgentX MTP3 topology: one DEP8 prefill worker feeds one
+# DEP32 decode worker at concurrency 448. Decode consumes P/D KV through NIXL
 # and MooncakeStore but skips Mooncake prefix lookup to avoid CPU overhead.
 
 model:
@@ -15,10 +18,10 @@ identity:
   container:
     image: "vllm/vllm-openai:nightly-dev-arm64-cu13.0.1-426e59f"
   frameworks:
-    dynamo: "1.3.0.dev20260720"
+    dynamo: "1.4.0"
 
 dynamo:
-  wheel: "1.3.0.dev20260720"
+  wheel: "1.4.0"
   install: true
 
 environment:
@@ -39,12 +42,12 @@ resources:
   gpus_per_node: 4
   het_jobs: false
   spread_workers: false
-  prefill_nodes: 4
-  decode_nodes: 3
-  prefill_workers: 2
+  prefill_nodes: 2
+  decode_nodes: 8
+  prefill_workers: 1
   decode_workers: 1
   gpus_per_prefill: 8
-  gpus_per_decode: 12
+  gpus_per_decode: 32
 
 infra:
   etcd_nats_dedicated_node: false
@@ -78,6 +81,7 @@ backend:
     prefill:
       kv-transfer-config: '{"kv_connector":"MultiConnector","kv_role":"kv_both","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_both","kv_load_failure_policy":"fail","kv_buffer_device":"cuda","kv_connector_extra_config":{"enforce_handshake_compat":false,"enable_cross_layers_blocks":false}},{"kv_connector":"MooncakeStoreConnector","kv_role":"kv_both","kv_connector_extra_config":{"load_async":true,"lookup_async":true,"enable_cross_layers_blocks":false,"enable_offload":false}}]}}'
       served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
+      safetensors-load-strategy: "prefetch"
       kv-cache-dtype: "fp8"
       tensor-parallel-size: 1
       pipeline-parallel-size: 1
@@ -87,8 +91,8 @@ backend:
       enable-expert-parallel: true
       enable-ep-weight-filter: true
       max-model-len: 1048576
-      max-num-seqs: 64
-      max-num-batched-tokens: 8192
+      max-num-seqs: 256
+      max-num-batched-tokens: 16384
       long-prefill-token-threshold: 1024
       trust-remote-code: true
       no-enable-flashinfer-autotune: true
@@ -104,22 +108,23 @@ backend:
     decode:
       kv-transfer-config: '{"kv_connector":"MultiConnector","kv_role":"kv_consumer","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_consumer","kv_load_failure_policy":"fail","kv_buffer_device":"cuda","kv_connector_extra_config":{"enforce_handshake_compat":false,"enable_cross_layers_blocks":false}},{"kv_connector":"MooncakeStoreConnector","kv_role":"kv_consumer","kv_connector_extra_config":{"load_async":true,"lookup_async":false,"enable_lookup":false,"enable_cross_layers_blocks":false,"enable_offload":false}}]}}'
       served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
+      safetensors-load-strategy: "prefetch"
       kv-cache-dtype: "fp8"
       tensor-parallel-size: 1
       pipeline-parallel-size: 1
-      data-parallel-size: 12
+      data-parallel-size: 32
       data-parallel-rpc-port: 13345
       enable-cumem-allocator: true
       enable-expert-parallel: true
       enable-ep-weight-filter: true
       max-model-len: 1048576
-      max-num-seqs: 192
-      max-num-batched-tokens: 768
+      max-num-seqs: 32
+      max-num-batched-tokens: 128
       trust-remote-code: true
       no-enable-flashinfer-autotune: true
       block-size: 256
       compilation-config: '{"cudagraph_mode":"FULL_DECODE_ONLY","mode":0}'
-      max-cudagraph-capture-size: 768
+      max-cudagraph-capture-size: 128
       gpu-memory-utilization: 0.90
       no-disable-hybrid-kv-cache-manager: true
       tokenizer-mode: "deepseek_v4"
@@ -149,11 +154,11 @@ backend:
     NCCL_NVLS_ENABLE: "1"
     VLLM_RANDOMIZE_DP_DUMMY_INPUTS: "1"
     NCCL_IB_HCA: "mlx5_0,mlx5_1,mlx5_2,mlx5_3"
-    VLLM_PREFIX_CACHE_RETENTION_INTERVAL: "32768"
+    VLLM_PREFIX_CACHE_RETENTION_INTERVAL: "0"
     VLLM_USE_BREAKABLE_CUDAGRAPH: "0"
     VLLM_CONNECTOR_PREFETCH_DEPTH: "8"
     VLLM_DSV4_MEGA_FP8_COMBINE: "1"
-    DG_JIT_CACHE_DIR: "/tmp/dg-cache-dsv4-gb300-2p1d-prefill-{job_id}"
+    DG_JIT_CACHE_DIR: "/tmp/dg-cache-dsv4-gb300-1p1d-dep8-prefill-c448-{job_id}"
     MC_ENABLE_DEST_DEVICE_AFFINITY: "1"
     MC_STORE_CLIENT_METRIC: "1"
     MC_STORE_CLIENT_METRIC_INTERVAL: "5"
@@ -168,7 +173,7 @@ backend:
     VLLM_V2_WARMUP_MAX_NUM_SEQS: "20"
     VLLM_SERVER_DEV_MODE: "1"
     VLLM_USE_V2_MODEL_RUNNER: "1"
-    VLLM_MOONCAKE_LOAD_RECV_THREADS: "20"
+    VLLM_MOONCAKE_LOAD_RECV_THREADS: "4"
     VLLM_ALLREDUCE_USE_SYMM_MEM: "0"
     UCX_MEMTYPE_CACHE: "n"
     UCX_NET_DEVICES: "mlx5_0:1,mlx5_1:1,mlx5_2:1,mlx5_3:1"
@@ -178,9 +183,9 @@ backend:
     NCCL_NVLS_ENABLE: "1"
     VLLM_RANDOMIZE_DP_DUMMY_INPUTS: "1"
     NCCL_IB_HCA: "mlx5_0,mlx5_1,mlx5_2,mlx5_3"
-    VLLM_PREFIX_CACHE_RETENTION_INTERVAL: "32768"
+    VLLM_PREFIX_CACHE_RETENTION_INTERVAL: "0"
     VLLM_DSV4_MEGA_FP8_COMBINE: "1"
-    DG_JIT_CACHE_DIR: "/tmp/dg-cache-dsv4-gb300-2p1d-dep12-decode-{job_id}"
+    DG_JIT_CACHE_DIR: "/tmp/dg-cache-dsv4-gb300-1p1d-dep32-decode-c448-{job_id}"
     MC_ENABLE_DEST_DEVICE_AFFINITY: "1"
     MC_STORE_CLIENT_METRIC: "1"
     MC_STORE_CLIENT_METRIC_INTERVAL: "5"
