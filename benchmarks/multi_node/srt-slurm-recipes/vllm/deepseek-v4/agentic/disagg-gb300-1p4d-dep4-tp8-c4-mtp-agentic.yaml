@@ -178,7 +178,9 @@ srun_options:
   container-remap-root: ""
 
 benchmark:
-  client_placement: last_decode
+  # The AgentX client uses localhost:8000, so colocate it with the Dynamo
+  # frontend launched on the first decode node.
+  client_placement: first_decode
   type: custom
   use_chat_template: true
   command: bash /infmax-workspace/benchmarks/multi_node/agentic_srt.sh

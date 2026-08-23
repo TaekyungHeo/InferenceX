@@ -6417,3 +6417,14 @@
   description:
     - "Add more GB300 AgentX vLLM MTP P/D points."
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/2665
+
+- config-keys:
+    - dsv4-fp4-gb300-dynamo-vllm-agentic-mtp-disagg
+  scenario-type:
+    - agentic-coding
+  description:
+    - "Colocate the c4 AgentX client with its first-decode Dynamo frontend."
+    - "Replace the c256 DEP4 prefill with DEP8 while retaining its DEP32 decode worker."
+    - "Replace the c1792 2P DEP8/DEP16 point with a c1728 3P DEP8/DEP16 topology."
+    - "Restrict PR #2302's test sweep to the corrected c4, c256, and c1728 points."
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/2302
