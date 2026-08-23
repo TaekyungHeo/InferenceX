@@ -6428,3 +6428,20 @@
     - "Replace the c1792 2P DEP8/DEP16 point with a c1728 3P DEP8/DEP16 topology."
     - "Restrict PR #2302's test sweep to the corrected c4, c256, and c1728 points."
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/2302
+
+- config-keys:
+    - dsv4-fp4-gb300-dynamo-vllm-agentic-mtp-disagg
+  scenario-type:
+    - agentic-coding
+  description:
+    - "Raise the c1728 AIPerf TCP user timeout from 30 seconds to 15 minutes so cache-pressure warmup can survive transient frontend backpressure."
+    - "Restore the c256 DEP8/DEP32 decode limits to max-num-seqs 4, max-num-batched-tokens 16, and max-cudagraph-capture-size 16."
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/2302
+
+- config-keys:
+    - dsv4-fp4-gb300-dynamo-vllm-agentic-mtp-disagg
+  scenario-type:
+    - agentic-coding
+  description:
+    - "Restrict PR #2302's targeted rerun to only the modified c1728 and c256 points, omitting the already-passing c4 point."
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/2302

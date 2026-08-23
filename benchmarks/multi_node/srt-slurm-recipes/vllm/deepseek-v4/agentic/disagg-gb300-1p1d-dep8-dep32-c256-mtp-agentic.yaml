@@ -1,6 +1,6 @@
 # Source: https://github.com/SemiAnalysisAI/InferenceX/blob/2454f220d618232013baa4b68d19b0f9f39c7bc5/benchmarks/multi_node/srt-slurm-recipes/vllm/deepseek-v4/agentic/disagg-gb300-1p1d-dep8-dep32-c448-mtp-agentic.yaml
 # Reuse the passing c448 point's DEP8/DEP32 topology at lower concurrency,
-# retaining the c256 batching and isolated JIT cache paths.
+# restoring the c388-proven 4/16/16 decode limits and isolated JIT cache paths.
 name: "svf-vllm-disagg-gb300-1p1d-dep8-dep32-c256-mtp-agentic"
 
 # GB300 AgentX MTP3 topology: one DEP8 prefill worker feeds one
@@ -118,13 +118,13 @@ backend:
       enable-expert-parallel: true
       enable-ep-weight-filter: true
       max-model-len: 1048576
-      max-num-seqs: 16
-      max-num-batched-tokens: 64
+      max-num-seqs: 4
+      max-num-batched-tokens: 16
       trust-remote-code: true
       no-enable-flashinfer-autotune: true
       block-size: 256
       compilation-config: '{"cudagraph_mode":"FULL_DECODE_ONLY","mode":0}'
-      max-cudagraph-capture-size: 64
+      max-cudagraph-capture-size: 16
       gpu-memory-utilization: 0.90
       no-disable-hybrid-kv-cache-manager: true
       tokenizer-mode: "deepseek_v4"

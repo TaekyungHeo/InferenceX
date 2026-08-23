@@ -206,6 +206,9 @@ benchmark:
     RESULT_DIR: "/logs/agentic"
     PORT: "8000"
     IS_MULTINODE: "true"
+    # The c1728 cache-pressure burst can leave client writes unacknowledged
+    # beyond AIPerf's 30-second default while the frontend drains its queue.
+    AIPERF_HTTP_TCP_USER_TIMEOUT: "900000"
     AIPERF_USE_DYNAMO_CONV_AWARE_ROUTING: "0"
     AIPERF_HTTP_X_DYNAMO_SESSION_ID_FROM_CORRELATION_ID: "true"
     # Avoid concurrent readers observing a mismatched mmap data/index pair.
