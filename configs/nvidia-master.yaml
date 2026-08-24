@@ -7897,74 +7897,22 @@ dsv4-fp4-gb300-dynamo-vllm-agentic-mtp-disagg:
   scenarios:
     agentic-coding:
     - search-space:
-      # Test-only PR #2302 matrix: exercise only the four targeted P/D points.
+      # Test-only PR #2302 matrix: exercise only DEP4/DEP16 at c256.
       # Keep the checked-in recipes on real MTP verification. Throughput jobs
       # inject the committed golden AL at launch; EVAL_ONLY leaves them real.
-      # DEP8 prefill with DEP32 decode at concurrency 256. The recipe uses
-      # c388-proven decode limits: 4 sequences, 16 batched tokens, graph 16.
+      # Keep the proven c128 topology and 4/16/16 decode limits at c256.
       - spec-decoding: mtp
         conc-list: [256]
         router: { name: dynamo-router, version: "1.4.0" }
         prefill:
           num-worker: 1
-          tp: 8
-          ep: 8
-          dp-attn: true
-          additional-settings:
-          - "SYNTHETIC_ACCEPTANCE=true"
-          - "SYNTHETIC_ACCEPTANCE_LENGTH=2.49"
-          - "CONFIG_FILE=recipes/vllm/deepseek-v4/agentic/disagg-gb300-1p1d-dep8-dep32-c256-mtp-agentic.yaml"
-        decode:
-          num-worker: 1
-          tp: 32
-          ep: 32
-          dp-attn: true
-      - spec-decoding: mtp
-        conc-list: [128]
-        router: { name: dynamo-router, version: "1.4.0" }
-        prefill:
-          num-worker: 1
-          tp: 8
-          ep: 8
-          dp-attn: true
-          additional-settings:
-          - "SYNTHETIC_ACCEPTANCE=true"
-          - "SYNTHETIC_ACCEPTANCE_LENGTH=2.49"
-          - "CONFIG_FILE=recipes/vllm/deepseek-v4/agentic/disagg-gb300-1p1d-dep8-dep32-c128-mtp-agentic.yaml"
-        decode:
-          num-worker: 1
-          tp: 32
-          ep: 32
-          dp-attn: true
-      - spec-decoding: mtp
-        conc-list: [128]
-        router: { name: dynamo-router, version: "1.4.0" }
-        prefill:
-          num-worker: 1
           tp: 4
           ep: 4
           dp-attn: true
           additional-settings:
           - "SYNTHETIC_ACCEPTANCE=true"
           - "SYNTHETIC_ACCEPTANCE_LENGTH=2.49"
-          - "CONFIG_FILE=recipes/vllm/deepseek-v4/agentic/disagg-gb300-1p1d-dep4-dep16-c128-mtp-agentic.yaml"
-        decode:
-          num-worker: 1
-          tp: 16
-          ep: 16
-          dp-attn: true
-      - spec-decoding: mtp
-        conc-list: [64]
-        router: { name: dynamo-router, version: "1.4.0" }
-        prefill:
-          num-worker: 1
-          tp: 4
-          ep: 4
-          dp-attn: true
-          additional-settings:
-          - "SYNTHETIC_ACCEPTANCE=true"
-          - "SYNTHETIC_ACCEPTANCE_LENGTH=2.49"
-          - "CONFIG_FILE=recipes/vllm/deepseek-v4/agentic/disagg-gb300-1p1d-dep4-dep16-c64-mtp-agentic.yaml"
+          - "CONFIG_FILE=recipes/vllm/deepseek-v4/agentic/disagg-gb300-1p1d-dep4-dep16-c256-mtp-agentic.yaml"
         decode:
           num-worker: 1
           tp: 16
