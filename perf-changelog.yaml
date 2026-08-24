@@ -6445,3 +6445,13 @@
   description:
     - "Restrict PR #2302's targeted rerun to only the modified c1728 and c256 points, omitting the already-passing c4 point."
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/2302
+
+- config-keys:
+    - dsv4-fp4-gb300-dynamo-vllm-agentic-mtp-disagg
+  scenario-type:
+    - agentic-coding
+  description:
+    - "Keep c256 on one DEP8 prefill and one DEP32 decode worker with decode max-num-seqs 4."
+    - "Replace the c1728 test point with DEP8/DEP32 at c128 plus DEP4/DEP16 at c128 and c64."
+    - "Restrict PR #2302's test matrix to these four targeted points."
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/2302
