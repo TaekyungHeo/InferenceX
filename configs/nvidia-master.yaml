@@ -7900,7 +7900,7 @@ dsv4-fp4-gb300-dynamo-vllm-agentic-mtp-disagg:
       # Test-only PR #2302 matrix: exercise only DEP4/DEP16 at c256.
       # Keep the checked-in recipes on real MTP verification. Throughput jobs
       # inject the committed golden AL at launch; EVAL_ONLY leaves them real.
-      # Keep the proven c128 topology and 4/16/16 decode limits at c256.
+      # Keep the proven c128 topology and use 8/32/32 decode limits at c256.
       - spec-decoding: mtp
         conc-list: [256]
         router: { name: dynamo-router, version: "1.4.0" }

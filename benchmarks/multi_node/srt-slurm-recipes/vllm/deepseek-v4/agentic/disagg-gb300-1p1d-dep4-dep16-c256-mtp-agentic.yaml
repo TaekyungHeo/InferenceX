@@ -1,6 +1,6 @@
 # Derived from PR #2302's DEP8/DEP32 c256 recipe.
 # Halve the prefill/decode topology while preserving its conservative
-# 4/16/16 decode limits and isolated JIT cache paths.
+# 8/32/32 decode limits and isolated JIT cache paths.
 name: "svf-vllm-disagg-gb300-1p1d-dep4-dep16-c256-mtp-agentic"
 
 # GB300 AgentX MTP3 topology: one DEP4 prefill worker feeds one
@@ -118,13 +118,13 @@ backend:
       enable-expert-parallel: true
       enable-ep-weight-filter: true
       max-model-len: 1048576
-      max-num-seqs: 4
-      max-num-batched-tokens: 16
+      max-num-seqs: 8
+      max-num-batched-tokens: 32
       trust-remote-code: true
       no-enable-flashinfer-autotune: true
       block-size: 256
       compilation-config: '{"cudagraph_mode":"FULL_DECODE_ONLY","mode":0}'
-      max-cudagraph-capture-size: 16
+      max-cudagraph-capture-size: 32
       gpu-memory-utilization: 0.90
       no-disable-hybrid-kv-cache-manager: true
       tokenizer-mode: "deepseek_v4"

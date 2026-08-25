@@ -6463,3 +6463,11 @@
   description:
     - "Retarget PR #2302 to only one DEP4 prefill and one DEP16 decode worker at concurrency 256."
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/2302
+
+- config-keys:
+    - dsv4-fp4-gb300-dynamo-vllm-agentic-mtp-disagg
+  scenario-type:
+    - agentic-coding
+  description:
+    - "Raise the DEP16 decode limits from 4/16/16 to 8/32/32 for PR #2302's targeted c256 retry."
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/2302
