@@ -123,7 +123,16 @@ SERVER_PROMPT_SOURCE_KEYS = {
     "raw",
 }
 REQUEST_METRICS_KEYS = {"qps", "latency", "tokens", "throughput", "cache"}
-REQUEST_LATENCY_KEYS = {"ttft", "e2el", "itl", "tpot", "intvty"}
+REQUEST_LATENCY_KEYS = {
+    "ttft",
+    "e2el",
+    "itl",
+    "tpot",
+    "intvty",
+    "e2e_norm_intvty",
+    "full_response_itl",
+    "full_response_intvty",
+}
 REQUEST_TOKEN_KEYS = {"input", "output_actual", "output_expected"}
 REQUEST_THROUGHPUT_KEYS = {
     "input",
@@ -334,6 +343,7 @@ def _run_processor(
             "KV_OFFLOADING": "none",
             "RUNNER_TYPE": "b200-x4",
             "IMAGE": "test/image:0.1",
+            "RECIPE_FINGERPRINT": "b" * 64,
             "SPEC_DECODING": "none",
             "DISAGG": "false",
             "IS_MULTINODE": "false",
@@ -364,6 +374,7 @@ def test_processor_emits_nested_request_and_server_metrics(tmp_path: Path):
     result_dir = _write_fixture(tmp_path)
     output_dir = tmp_path / "out"
     agg = _run_processor(result_dir, output_dir)
+    assert agg["recipe_fingerprint"] == "b" * 64
     missing = AGG_TOP_LEVEL_KEYS - set(agg.keys())
     assert not missing, f"agg JSON missing top-level keys: {sorted(missing)}"
     assert not (_flat_request_keys(result_dir) & set(agg.keys()))
@@ -486,6 +497,146 @@ def test_processor_derives_interactivity_from_matching_itl_percentile(
     assert latency["intvty"]["p90"] < 20
 
 
+def test_processor_aggregates_e2e_normalized_interactivity_from_slow_tail(
+    tmp_path: Path,
+):
+    result_dir = tmp_path / "results"
+    artifact = result_dir / "aiperf_artifacts"
+    artifact.mkdir(parents=True)
+
+    # E2EL / OSL ratios are 0.02 and 0.04 seconds per output token.
+    records = [
+        _make_record(
+            conv_id="trace-fast",
+            turn_index=0,
+            isl=100,
+            osl=50,
+            ttft_ms=30.0,
+            e2e_ms=1_000.0,
+            itl_ms=10.0,
+            start_ns=1_000_000_000,
+            end_ns=2_000_000_000,
+        ),
+        _make_record(
+            conv_id="trace-slow",
+            turn_index=0,
+            isl=100,
+            osl=50,
+            ttft_ms=30.0,
+            e2e_ms=2_000.0,
+            itl_ms=10.0,
+            start_ns=2_000_000_000,
+            end_ns=4_000_000_000,
+        ),
+    ]
+    with open(artifact / "profile_export.jsonl", "w") as f:
+        for record in records:
+            f.write(json.dumps(record) + "\n")
+    with open(artifact / "profile_export_aiperf.json", "w") as f:
+        json.dump({"request_count": len(records)}, f)
+
+    agg = _run_processor(result_dir, tmp_path / "out")
+    metric = agg["request_metrics"]["latency"]["e2e_norm_intvty"]
+
+    assert metric["mean"] == pytest.approx(1 / 0.03)
+    assert metric["p75"] == pytest.approx(1 / 0.035)
+    assert metric["p90"] == pytest.approx(1 / 0.038)
+    assert metric["std"] == pytest.approx(12.5)
+    assert metric["p50"] >= metric["p75"] >= metric["p90"] >= metric["p95"]
+    assert "p99" not in metric
+    _assert_stable_request_metrics_schema(agg)
+
+
+def test_e2e_normalized_interactivity_pairs_metrics_within_each_record():
+    missing_osl = _make_record(
+        conv_id="trace-missing-osl",
+        turn_index=0,
+        isl=100,
+        osl=50,
+        ttft_ms=30.0,
+        e2e_ms=1_000.0,
+        itl_ms=10.0,
+        start_ns=1_000_000_000,
+        end_ns=2_000_000_000,
+    )
+    del missing_osl["metrics"]["output_sequence_length"]
+    missing_e2el = _make_record(
+        conv_id="trace-missing-e2el",
+        turn_index=0,
+        isl=100,
+        osl=50,
+        ttft_ms=30.0,
+        e2e_ms=1_000.0,
+        itl_ms=10.0,
+        start_ns=2_000_000_000,
+        end_ns=3_000_000_000,
+    )
+    del missing_e2el["metrics"]["request_latency"]
+
+    _, nested = compute_request_metrics([missing_osl, missing_e2el])
+
+    assert nested["latency"]["e2e_norm_intvty"] == {}
+
+
+def test_e2e_normalized_interactivity_skips_nonpositive_and_nonfinite_values():
+    invalid_pairs = [
+        (0.0, 50),
+        (-1.0, 50),
+        (float("nan"), 50),
+        (float("inf"), 50),
+        (1_000.0, 0),
+        (1_000.0, -1),
+        (1_000.0, float("nan")),
+        (1_000.0, float("inf")),
+    ]
+    records = []
+    for idx, (e2e_ms, osl) in enumerate(invalid_pairs):
+        records.append(
+            _make_record(
+                conv_id=f"trace-invalid-{idx}",
+                turn_index=0,
+                isl=100,
+                osl=osl,
+                ttft_ms=30.0,
+                e2e_ms=e2e_ms,
+                itl_ms=10.0,
+                start_ns=(idx + 1) * 1_000_000_000,
+                end_ns=(idx + 2) * 1_000_000_000,
+            )
+        )
+    records.append(
+        _make_record(
+            conv_id="trace-valid",
+            turn_index=0,
+            isl=100,
+            osl=50,
+            ttft_ms=30.0,
+            e2e_ms=1_000.0,
+            itl_ms=10.0,
+            start_ns=10_000_000_000,
+            end_ns=11_000_000_000,
+        )
+    )
+
+    _, nested = compute_request_metrics(records)
+    metric = nested["latency"]["e2e_norm_intvty"]
+
+    assert metric == {
+        "mean": 50.0,
+        "p50": 50.0,
+        "p75": 50.0,
+        "p90": 50.0,
+        "p95": 50.0,
+        "std": 0.0,
+    }
+
+
+def test_e2e_normalized_interactivity_empty_without_valid_samples():
+    _, nested = compute_request_metrics([])
+
+    assert nested["latency"]["e2e_norm_intvty"] == {}
+
+
 def test_processor_throughput_per_gpu(tmp_path: Path):
     result_dir = _write_fixture(tmp_path)
     output_dir = tmp_path / "out"
@@ -508,6 +659,48 @@ def test_processor_throughput_per_gpu(tmp_path: Path):
     assert per_gpu["output_tput_tps"] == pytest.approx(
         throughput["output"]["tokens_per_second"] / 16
     )
+
+
+def test_processor_aggregates_full_response_itl_and_interactivity(tmp_path: Path):
+    result_dir = tmp_path / "results"
+    artifact = result_dir / "aiperf_artifacts"
+    artifact.mkdir(parents=True)
+
+    full_response_itls_ms = (5.469791, 5.0, 4.0)
+    with open(artifact / "profile_export.jsonl", "w") as f:
+        for idx, full_response_itl_ms in enumerate(full_response_itls_ms):
+            record = _make_record(
+                conv_id=f"trace-{idx}",
+                turn_index=0,
+                isl=100,
+                osl=26_571,
+                ttft_ms=529.058811,
+                e2e_ms=610.559573,
+                itl_ms=0.003067398,
+                start_ns=(idx + 1) * 1_000_000_000,
+                end_ns=(idx + 1) * 1_000_000_000 + 145_861_451_008,
+            )
+            record["metrics"]["full_response_inter_token_latency"] = {
+                "value": full_response_itl_ms,
+                "unit": "ms",
+            }
+            f.write(json.dumps(record) + "\n")
+
+    with open(artifact / "profile_export_aiperf.json", "w") as f:
+        json.dump({"request_count": len(full_response_itls_ms)}, f)
+
+    agg = _run_processor(result_dir, tmp_path / "out")
+    latency = agg["request_metrics"]["latency"]
+    full_response_itl = latency["full_response_itl"]
+    full_response_intvty = latency["full_response_intvty"]
+
+    assert full_response_itl["p50"] == pytest.approx(0.005)
+    assert full_response_itl["p75"] == pytest.approx(0.00523)
+    assert full_response_intvty["p50"] == pytest.approx(
+        1 / full_response_itl["p50"]
+    )
+    assert full_response_intvty["p75"] == pytest.approx(1 / 0.0052348955)
+    assert full_response_intvty["p75"] < full_response_intvty["p50"]
 
 
 def test_processor_surfaces_allocated_cpu_dram(tmp_path: Path):
@@ -626,7 +819,7 @@ def test_processor_surfaces_request_accounting(tmp_path: Path):
         isl=100,
         osl=50,
         ttft_ms=30.0,
-        e2e_ms=1_000.0,
+        e2e_ms=10_000.0,
         itl_ms=10.0,
         start_ns=2_000_000_000,
         end_ns=3_000_000_000,
@@ -638,7 +831,7 @@ def test_processor_surfaces_request_accounting(tmp_path: Path):
         isl=100,
         osl=50,
         ttft_ms=30.0,
-        e2e_ms=1_000.0,
+        e2e_ms=20_000.0,
         itl_ms=10.0,
         start_ns=3_000_000_000,
         end_ns=4_000_000_000,
@@ -664,6 +857,9 @@ def test_processor_surfaces_request_accounting(tmp_path: Path):
         "error_categories": {"HTTPStatusError": 1},
     }
     assert agg["server_metrics"]["tokens"]["requests_completed"] == 1
+    e2e_norm_intvty = agg["request_metrics"]["latency"]["e2e_norm_intvty"]
+    assert e2e_norm_intvty["mean"] == pytest.approx(50.0)
+    assert e2e_norm_intvty["p95"] == pytest.approx(50.0)
 
 
 def test_processor_handles_missing_server_metrics(tmp_path: Path):

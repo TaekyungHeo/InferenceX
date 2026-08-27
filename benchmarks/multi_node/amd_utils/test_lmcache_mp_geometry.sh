@@ -103,14 +103,14 @@ check "module path -> ZMQ-style host added" \
 echo
 echo "=== serve args ==="
 reset_env; KV_CACHE_DTYPE=fp8 lmcache_mp_derive_geometry 8 >/dev/null
-A=$(LMCACHE_MAX_NUM_SEQS=32 LMCACHE_GPU_MEM_UTIL=0.85 lmcache_mp_serve_args | paste -sd' ')
+A=$(LMCACHE_MAX_NUM_SEQS=32 LMCACHE_GPU_MEM_UTIL=0.85 lmcache_mp_serve_args | paste -sd ' ' -)
 check "serve args carry the derived budget" \
   "$(printf '%s' "$A" | grep -c -- '--max-num-batched-tokens 3000')" 1
 check "serve args force align" \
   "$(printf '%s' "$A" | grep -c -- '--mamba-cache-mode align')" 1
 check "serve args carry the GPU headroom levers" \
   "$(printf '%s' "$A" | grep -c -- '--max-num-seqs 32 --gpu-memory-utilization 0.85')" 1
-A2=$(lmcache_mp_serve_args | paste -sd' ')
+A2=$(lmcache_mp_serve_args | paste -sd ' ' -)
 check "headroom levers omitted when unset" \
   "$(printf '%s' "$A2" | grep -c -- '--max-num-seqs')" 0
 
