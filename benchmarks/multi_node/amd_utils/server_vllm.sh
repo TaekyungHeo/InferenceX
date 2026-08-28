@@ -979,6 +979,23 @@ done
 echo "Prefill node IPs: ${PREFILL_ARGS}"
 echo "Decode  node IPs: ${DECODE_ARGS}"
 
+
+stage_slurm_logs_and_exit() {
+    local rc="${1:-1}"
+    local reason="${2:-server startup failure}"
+    echo "ERROR: ${reason}" >&2
+    if [[ "$DRY_RUN" -eq 0 ]]; then
+        local logs_output="${BENCHMARK_LOGS_DIR:-/run_logs}/logs"
+        mkdir -p "$logs_output" 2>/dev/null || true
+        if [[ -n "${SLURM_JOB_ID:-}" && -d "/run_logs/slurm_job-${SLURM_JOB_ID}" ]]; then
+            cp -r "/run_logs/slurm_job-${SLURM_JOB_ID}" "$logs_output/" 2>/dev/null || true
+            echo "Staged server logs to ${logs_output}/slurm_job-${SLURM_JOB_ID}" >&2
+        fi
+    fi
+    exit "$rc"
+}
+
+
 # Per-worker Prometheus /metrics and cache-flush base URLs for agentic replay.
 # vLLM workers listen on SERVER_PORT; the vllm-router on ROUTER_PORT does not
 # expose Prometheus or fan out cache resets.
@@ -1077,7 +1094,8 @@ if [ "$NODE_RANK" -eq 0 ]; then
             --node-ips ${IPADDRS} \
             --node-ports $SERVER_PORT \
             --wait-for-all-ports \
-            --timeout "${SERVER_UP_TIMEOUT:-1800}"
+            --timeout "${SERVER_UP_TIMEOUT:-1800}" \
+            || stage_slurm_logs_and_exit 1 "timed out waiting for all prefill/decode server ports"
     fi
 
     echo "Congratulations!!! All prefill and decode servers are up . . ."
@@ -1093,7 +1111,8 @@ if [ "$NODE_RANK" -eq 0 ]; then
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "DRY RUN: $HEALTH_BARRIER_CMD"
     else
-        eval "$HEALTH_BARRIER_CMD"
+        eval "$HEALTH_BARRIER_CMD" \
+            || stage_slurm_logs_and_exit 1 "timed out waiting for router health"
         echo "MoRI-IO proxy is ready for benchmarking"
     fi
 

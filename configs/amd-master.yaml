@@ -688,7 +688,7 @@ kimik3-fp4-mi355x-vllm-disagg-agentic:
     agentic-coding:
     - dram-utilization: 0.80
       search-space:
-      - spec-decoding: draft_model
+      - spec-decoding: "none"
         conc-list: [ 40 ]
         kv-offloading: dram
         kv-offload-backend: { name: mooncake, version: "0.3.11.post1" }
@@ -699,6 +699,9 @@ kimik3-fp4-mi355x-vllm-disagg-agentic:
           dp-attn: false
           additional-settings:
           - "PREFILL_NODES=1"
+          - "GPU_MEMORY_UTILIZATION=0.88"
+          - "DISABLE_SPECULATIVE=1"
+          - "IX_AIPERF_TOKENIZER=moonshotai/Kimi-K3"
           - "VLLM_PATCH_46240=1"
           - "VLLM_K3_FORK_REF=yichaozhu/k3-tpdcp-hetero"
           - "HF_HUB_CACHE=/models/.cache/huggingface/hub"
